@@ -3,6 +3,7 @@ import typing
 import random                                               # радномайзер
 import pafy
 import ffmpeg
+import json
 from discord import *
 from youtube_dl import YoutubeDL
 from discord.ext import commands
@@ -10,7 +11,10 @@ from discord.ext import commands
 YDL_OPTIONS = {'format': 'worstaudio/best', 'noplaylist': 'True', 'simulate': 'True', 'preferredquality': '192', 'preferredcodec': 'mp3', 'key': 'FFmpegExtractAudio'}
 FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
 
-TOKEN = "ODM0MTY4MzAyMjg0MTc3NDM4.YH89xQ.2xG1XbZW_neYpsTRgW-d8GZz3lc"
+with open("DS_BOT/info.json", "r") as f:
+    CONFIG = json.load(f)
+
+TOKEN = CONFIG["TOKEN"]
 
 bot = commands.Bot(command_prefix=('-'))
 bot.remove_command( 'help' )
