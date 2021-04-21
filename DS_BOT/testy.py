@@ -2,14 +2,14 @@ import discord
 import typing
 import random                                               # радномайзер
 import pafy
-import ffmpeg
 import json
 from discord import *
+from requests import get as r_get
 from youtube_dl import YoutubeDL
 from discord.ext import commands
 
 YDL_OPTIONS = {'format': 'worstaudio/best', 'noplaylist': 'True', 'simulate': 'True', 'preferredquality': '192', 'preferredcodec': 'mp3', 'key': 'FFmpegExtractAudio'}
-FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
+# FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
 
 with open("DS_BOT/info.json", "r") as f:
     CONFIG = json.load(f)
@@ -31,6 +31,15 @@ class ROLL_GAME():
 GAME_1 = ROLL_GAME()
 
 rn = 0
+
+
+def search(URL):
+    with YoutubeDL({'format': 'bestaudio', 'noplaylist':'True'}) as ydl:
+        try: r_get(URL)
+        except: info = ydl.extract_info(f"ytsearch:{URL}", download=False)['entries'][0]
+        else: info = ydl.extract_info(URL, download=False)
+    return (info, info['formats'][0]['url'])
+
 
 @bot.event
 async def on_ready():
@@ -144,7 +153,7 @@ async def N(ctx):                                       # Отказ от игр
 @bot.command() # указываем боту на то, что это его команда
 async def Throw(ctx):                                   # Бросок костей
     global Event
-    Cube = {                                        # Словарь для картинкок
+    Cube = {                                            # Словарь для картинкок
         1: '<:1_:834505302485237810>',
         2: '<:2_:834505302279192657>',
         3: '<:3_:834505302531113021>',
@@ -238,13 +247,38 @@ async def play(ctx, arg):           # not work
 
         URL = info['formats'][0]['url']
 
-        # vc.play(discord.FFmpegPCMAudio(executable="bin//ffmpeg.exe", source = URL, **FFMPEG_OPTIONS))
-        vc.play(discord.FFmpegPCMAudio("It`s a TRAP.mp3"))
+        vc.play(discord.FFmpegPCMAudio(executable="bin/ffmpeg.exe", source = URL, **FFMPEG_OPTIONS))
+        # vc.play(discord.FFmpegPCMAudio("It`s a TRAP.mp3"))
                 
         while vc.is_playing():
             await sleep(1)
         if not vc.is_paused():
             await vc.disconnect()
+
+
+@bot.command()
+async def yt(ctx, URL):
+
+    # Solves a problem I'll explain later
+    FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+
+    video, source = search(URL)
+    # voice = utils.get(bot.voice_clients, guild=ctx.guild)
+
+    if not ctx.message.author.voice:
+        Url_1 = discord.Embed(
+            title = "No Voice Channel. You need to be in a voice channel to use this command!"
+        )
+        await ctx.send(embed=Url_1)
+        return
+
+    channel = ctx.author.voice.channel
+    voice = await channel.connect()
+    
+    # await ctx.send(f"Now playing {info['title']}.")
+
+    voice.play(FFmpegPCMAudio(source, **FFMPEG_OPTS), after=lambda e: print('done', e))
+    voice.is_playing()
 
 
 @bot.command()
