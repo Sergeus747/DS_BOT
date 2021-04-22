@@ -22,15 +22,20 @@ bot.remove_command( 'help' )
 global vc
 Event = 0 # [1:Игра в кости; 2:]
 
-class ROLL_GAME():
+class ROLL_GAME():               # Класс парной игры в кости
     Is_playing = False           # Идет ли игра
     players = ["",""]            # Имена игроков
     points = [0,0]               # Очки игроков
     Whose_throw = 0              # Кто бросает
+    def reset(self):                 # Сброс игры в начальное состояние
+        self.Is_playing = False
+        self.points = [0,0]
+        self.Whose_throw = 0
+        return "Парные кости сброшены"
 
-GAME_1 = ROLL_GAME()
+GAME_1 = ROLL_GAME()             # Создание объекта класса, отвечающего за парную игру в кости
 
-rn = 0
+rn = 0                           # рандомная переменная для выбора номера статьи
 
 
 def search(URL):
@@ -64,6 +69,17 @@ async def arg_test(ctx, *args):
 @bot.command() # указываем боту на то, что это его команда
 async def bottles(ctx, amount: typing.Optional[int] = 99, *, liquid="beer"):
     await ctx.send('{} bottles of {} on the wall!'.format(amount, liquid))
+
+
+@bot.command() # указываем боту на то, что это его команда
+async def flip_coin(ctx):
+    Coin = {                                            # Словарь
+        0: "***Орел***",
+        1: "***Решка***",
+    }
+    side_of_the_coin = random.randint(1, 1000)          # Радном от 1 до 1000, чтобы улучшить процентное соотношение выпадения разных вариантов
+    # print(f'\n\nЧисло (1-1000): {side_of_the_coin}')
+    await ctx.send(f'{Coin[side_of_the_coin%2]}')       # Вывод резуьтата броска(остаток от деления на 2)
 
 
 @bot.command()                                          # указываем боту на то, что это его команда
@@ -140,7 +156,7 @@ async def N(ctx):                                       # Отказ от игр
     if Event == 1 and GAME_1.Is_playing == False:
         if ctx.message.author.mention == GAME_1.players[1]:
             Event = 0                                   # Отмена ивента
-            
+            GAME_1.reset()                              # Сброс игры в начальное состояние            
             await ctx.send(f'{GAME_1 .players[1]} трусливо избегает поединка\nПобеда автоматически присуждается {GAME_1 .players[0]}')
         else:
             await ctx.send(f'{ctx.message.author.mention} вас не вызывали на поединок, вы не можете отказаться')
@@ -164,37 +180,46 @@ async def Throw(ctx):                                   # Бросок кост�
                 Toss = random.randint(1, 6)
                 GAME_1.points[GAME_1.Whose_throw] += Toss
                 await ctx.send(f'{Cube[Toss]}')
-            await ctx.send(f'{GAME_1.players[GAME_1.Whose_throw]} ваше итоговое значение: {GAME_1.points[GAME_1.Whose_throw]}')
+            await ctx.send(f'{GAME_1.players[GAME_1.Whose_throw]} твоё итоговое значение: {GAME_1.points[GAME_1.Whose_throw]}')
             GAME_1.Whose_throw += 1
-            await ctx.send(f'{GAME_1.players[GAME_1.Whose_throw]} ваша очедерь. Чтобы совершить бросок напишите -Throw')
+            await ctx.send(f'{GAME_1.players[GAME_1.Whose_throw]} твоя очедерь. Чтобы совершить бросок напиши -Throw')
         elif  GAME_1.Whose_throw == 1 and ctx.message.author.mention == GAME_1.players[GAME_1.Whose_throw]:
             for number in [0, 1, 2]:
                 Toss = random.randint(1, 6)
                 GAME_1.points[GAME_1.Whose_throw] += Toss
                 await ctx.send(f'{Cube[Toss]}')
-            await ctx.send(f'{GAME_1.players[GAME_1.Whose_throw]} ваше итоговое значение: {GAME_1.points[GAME_1.Whose_throw]}')
-            GAME_1.Whose_throw = 0
+            await ctx.send(f'{GAME_1.players[GAME_1.Whose_throw]} твоё итоговое значение: {GAME_1.points[GAME_1.Whose_throw]}')
+            
             if GAME_1.points[0] > GAME_1.points[1]:
-                await ctx.send(f'{GAME_1.players[0]} одержал победу, поздравьте победителя!')
+                await ctx.send(f'{GAME_1.players[0]} одержал победу! Несите Blackjack и зовите шлюх!')
+                GAME_1.reset()                              # Сброс игры в начальное состояние
+                Event = 0                                   # Сброс номера ивента
             elif GAME_1.points[0] < GAME_1.points[1]:
-                await ctx.send(f'{GAME_1.players[1]} одержал победу, поздравьте победителя!')
+                await ctx.send(f'{GAME_1.players[1]} одержал победу, Несите Blackjack и зовите шлюх!')
+                GAME_1.reset()                              # Сброс игры в начальное состояние
+                Event = 0                                   # Сброс номера ивента
             else:
-                await ctx.send(f'Получается ничья. Сыграем ещё?)\nДля начала новой игры напишите "-Roll_play" "Имя противника"')
-
-            GAME_1.Is_playing = False                   # Завершение игры
-            GAME_1.points[0] = 0                        # Обнуление очков первого игрока
-            GAME_1.points[1] = 0                        # Обнуление очков второго игрока
-            GAME_1.Whose_throw = 0                      # Обнуление номера бросавшего 
-            Event = 0                                   # Сброс номера ивента
+                GAME_1.points = [0,0]
+                GAME_1.Whose_throw = 0
+                await ctx.send(f'Получается ничья. Сыграем ещё?)\n{GAME_1.players[0]} бросай по новой!\nЧтобы совершить бросок напиши -Throw')
         else:
-            await ctx.send(f'{ctx.message.author.mention} не ваша очедерь.')
+            await ctx.send(f'{ctx.message.author.mention} не твоя очередь.')
     else:
         await ctx.send(f'Нет активной игры')
 
 
-
-
-            
+@bot.command() # указываем боту на то, что это его команда
+async def Stop_games(ctx):                              # Остановка всех игр (дополнять каждый раз, когда завозите новую игру!!!!!!!!!!!!!!!!!!!)
+    global Event
+    if Event == 0:
+        await ctx.send(f'Нет запущенных игр.')
+    else:
+        GAME_1.reset()                                  # Сброс парных костей до базового состояния
+        print(f'\n Номер ивента: {Event}   Состояние игры: {GAME_1.Is_playing}\n\n')
+        # место дня новых ресеторв
+        await ctx.send(f'{ctx.message.author.mention} сказал конец веселью, своравайте доски, прячьте кости.')
+        Event = 0                                       # Сброс номера ивента
+           
 
 @bot.command() # указываем боту на то, что это его команда
 async def naxuy(ctx):
