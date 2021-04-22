@@ -11,7 +11,7 @@ from discord.ext import commands
 YDL_OPTIONS = {'format': 'worstaudio/best', 'noplaylist': 'True', 'simulate': 'True', 'preferredquality': '192', 'preferredcodec': 'mp3', 'key': 'FFmpegExtractAudio'}
 # FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn'}
 
-with open("DS_BOT/info.json", "r") as f:
+with open("info.json", "r") as f:
     CONFIG = json.load(f)
 
 TOKEN = CONFIG["TOKEN"]
@@ -78,7 +78,7 @@ async def condemn(ctx, *, condemned):                   # Осуждение: {a
         rn = random.randint(1, 10)
     
     Article = {                                         # Словарь для статей
-        1: "228 УК РФ: Незаконные приобретение, хранение, перевозка, изготовление, переработка наркотических средств, психотропных веществ или их аналогов",
+        1: "228 УК РФ: Незаконные приобретение, хранение, перевозка, изготовление переработка наркотических средств, психотропных веществ или их аналогов",
         2: "282 УК РФ: Возбуждение ненависти либо вражды, а равно унижение человеческого достоинства",
         3: "148 УК РФ: Нарушение права на свободу совести и вероисповеданий",
         4: "212.1 УК РФ: Неоднократное нарушение установленного порядка организации либо проведения собрания, митинга, демонстрации, шествия или пикетирования",
@@ -125,10 +125,7 @@ async def Y(ctx):                                       # Принятие иг�
     # print(f'\n Номер ивента: {Event}   Состояние игры: {GAME_1.Is_playing}\n\n')
     if Event == 1 and GAME_1.Is_playing == False:
         if ctx.message.author.mention == GAME_1.players[1]:
-            GAME_1.Is_playing = True                    # Начало игры
-            GAME_1.points[0] = 0                        # Обнуление очков первого игрока
-            GAME_1.points[1] = 0                        # Обнуление очков второго игрока
-            GAME_1.Whose_throw = 0                      # Обнуление номера бросавшего            
+            GAME_1.Is_playing = True                    # Начало игры           
             await ctx.send(f'{GAME_1.players[1]} принимает вызов! \nПервым бросок совершает {GAME_1.players[GAME_1.Whose_throw]}\nЧтобы совершить бросок напишите -Throw')
         else:
             await ctx.send(f'{ctx.message.author.mention} вас не вызывали на поединок, вы не можете согласиться')
@@ -144,7 +141,7 @@ async def N(ctx):                                       # Отказ от игр
         if ctx.message.author.mention == GAME_1.players[1]:
             Event = 0                                   # Отмена ивента
             
-            await ctx.send(f'{GAME_1 .players[1]} трусливо сбегает из поединка\nПобеда автоматически присуждается {GAME_1 .players[0]}')
+            await ctx.send(f'{GAME_1 .players[1]} трусливо избегает поединка\nПобеда автоматически присуждается {GAME_1 .players[0]}')
         else:
             await ctx.send(f'{ctx.message.author.mention} вас не вызывали на поединок, вы не можете отказаться')
     else:
@@ -182,14 +179,20 @@ async def Throw(ctx):                                   # Бросок кост�
             elif GAME_1.points[0] < GAME_1.points[1]:
                 await ctx.send(f'{GAME_1.players[1]} одержал победу, поздравьте победителя!')
             else:
-                await ctx.send(f'Получается ничья. Сыграем ещё?)\nДля начала новой игры напишите "-Roll_play" "Имя_противника"')
+                await ctx.send(f'Получается ничья. Сыграем ещё?)\nДля начала новой игры напишите "-Roll_play" "Имя противника"')
 
             GAME_1.Is_playing = False                   # Завершение игры
+            GAME_1.points[0] = 0                        # Обнуление очков первого игрока
+            GAME_1.points[1] = 0                        # Обнуление очков второго игрока
+            GAME_1.Whose_throw = 0                      # Обнуление номера бросавшего 
             Event = 0                                   # Сброс номера ивента
         else:
             await ctx.send(f'{ctx.message.author.mention} не ваша очедерь.')
     else:
         await ctx.send(f'Нет активной игры')
+
+
+
 
             
 
@@ -213,16 +216,18 @@ async def Yandex_login(ctx, login, password):           # Логинимся в 
 @bot.command()
 async def join(ctx):
 
-    if ctx.message.author.voice == None:
-        Url_1 = discord.Embed(
-            title = "No Voice Channel. You need to be in a voice channel to use this command!"
-        )
-        await ctx.send(embed=Url_1)
-        return
+    try:
+        if ctx.message.author.voice == None:
+            Url_1 = discord.Embed(
+                title = "No Voice Channel. You need to be in a voice channel to use this command!"
+            )
+            await ctx.send(embed=Url_1)
+            return
 
-    channel = ctx.author.voice.channel
-    vc = await channel.connect()
-
+        channel = ctx.author.voice.channel
+        vc = await channel.connect()
+    except ClientException:
+        await ctx.send(f'Ну не кричи ты так, тут я, тут...') 
 
 
 @bot.command()
@@ -283,8 +288,10 @@ async def yt(ctx, URL):
 
 @bot.command()
 async def leave(ctx):
-    await ctx.voice_client.disconnect()
-
+    try:
+        await ctx.voice_client.disconnect()
+    except AttributeError:
+        await ctx.send(f'Да ушел я уже, ушел, что ты такой злой?...')
 
 bot.run(TOKEN)
 # except Exception as e:
