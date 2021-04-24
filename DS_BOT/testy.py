@@ -1,9 +1,12 @@
 import discord
+import asyncio
+import os
 import typing
 import random                                               # радномайзер
 import pafy
 import json
 from discord import *
+from yandex_music import Client
 from requests import get as r_get
 from youtube_dl import YoutubeDL
 from discord.ext import commands
@@ -18,8 +21,10 @@ TOKEN = CONFIG["TOKEN"]
 
 bot = commands.Bot(command_prefix=('-'))
 bot.remove_command( 'help' )
+client = None
+voice = None
+Track_queue = []
 
-global vc
 Event = 0 # [1:Игра в кости; 2:]
 
 class ROLL_GAME():               # Класс парной игры в кости
@@ -192,12 +197,12 @@ async def Throw(ctx):                                   # Бросок кост�
             
             if GAME_1.points[0] > GAME_1.points[1]:
                 await ctx.send(f'{GAME_1.players[0]} одержал победу! Несите Blackjack и зовите шлюх!')
-                GAME_1.reset()                              # Сброс игры в начальное состояние
-                Event = 0                                   # Сброс номера ивента
+                GAME_1.reset()                          # Сброс игры в начальное состояние
+                Event = 0                               # Сброс номера ивента
             elif GAME_1.points[0] < GAME_1.points[1]:
                 await ctx.send(f'{GAME_1.players[1]} одержал победу, Несите Blackjack и зовите шлюх!')
-                GAME_1.reset()                              # Сброс игры в начальное состояние
-                Event = 0                                   # Сброс номера ивента
+                GAME_1.reset()                          # Сброс игры в начальное состояние
+                Event = 0                               # Сброс номера ивента
             else:
                 GAME_1.points = [0,0]
                 GAME_1.Whose_throw = 0
@@ -231,63 +236,135 @@ async def naxuy(ctx):
     await ctx.send(embed=Url_1)
 
 
-@bot.command()                                          # указываем боту на то, что это его команда
-async def Yandex_login(ctx, login, password):           # Логинимся в свой аккаунт Яндекса
-    print(f' Пользователь: {login}\n Пароль: {password}\n')
-    client = Client.from_credentials('DS-BOT-CHILL@yandex.com', 'Aral7472')
-    await ctx.message.delete()                          # Удаление запроса пользователя (чтобы не палить личные данные данные)
-
-
 @bot.command()
 async def join(ctx):
-
+    global voice
     try:
         if ctx.message.author.voice == None:
-            Url_1 = discord.Embed(
-                title = "No Voice Channel. You need to be in a voice channel to use this command!"
-            )
-            await ctx.send(embed=Url_1)
+            await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
             return
 
         channel = ctx.author.voice.channel
-        vc = await channel.connect()
+        voice = await channel.connect()
     except ClientException:
         await ctx.send(f'Ну не кричи ты так, тут я, тут...') 
 
 
-@bot.command()
-async def play(ctx, arg):           # not work
+@bot.command()                                          # указываем боту на то, что это его команда
+async def Yanlog(ctx):                            # Логинимся в свой аккаунт Яндекса
+    global client
+    client = Client()
+    # print(CONFIG["EMAIL"], CONFIG["PASSWORD"])
+    client = Client.from_credentials(CONFIG["EMAIL"], CONFIG["PASSWORD"])
+    # client.users_likes_tracks()[0].fetch_track().download('example.mp3')
+    # await ctx.message.delete()                        # Удаление запроса пользователя (чтобы не палить личные данные данные)
 
-    if ctx.message.author.voice == None:
-        Url_1 = discord.Embed(
-            title = "No Voice Channel. You need to be in a voice channel to use this command!"
-        )
-        await ctx.send(embed=Url_1)
+
+@bot.command()                                          # указываем боту на то, что это его команда
+async def Yandex_like_play(ctx, number, from_q = False):
+    global client
+    global voice
+    global Track_queue
+
+    if from_q:
+        if Track_queue:
+            number = Track_queue[0]
+            Track_queue.remove(Track_queue[0])
+        else:
+            return
+    try:
+        os.system("rm example.mp3")
+        client.users_likes_tracks()[int(number)].fetch_track().download('example.mp3')
+    except:
+        await ctx.send(f'{ctx.message.author.mention}, я такого трека не нашел, ты уверен что он есть?')
         return
 
-    channel = ctx.author.voice.channel
-    vc = await channel.connect()
+    try:
+        if ctx.message.author.voice == None:
+            await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
+            return
 
-    if vc.is_playing():
-        await ctx.send(f'{ctx.message.author.mention}, музыка уже проигрывается.')
+        channel = ctx.author.voice.channel
+        voice = await channel.connect()
+    except ClientException:
+        print(f'\nБот уже на канале, идем дальше\n')
 
+    if voice.is_playing():
+        Track_queue.append(number)
+        await ctx.send(f'Там уже что-то бренькает, так и быть, добавлю в очередь')
     else:
-        with YoutubeDL(YDL_OPTIONS) as ydl:
-            info = ydl.extract_info(arg, download=False)
+        loop = asyncio.get_event_loop()
+        await ctx.send(f'сейчас играет: {client.users_likes_tracks()[int(number)].fetch_track().artists_name()[0]}'\
+        f': {client.users_likes_tracks()[int(number)].fetch_track().title}'\
+        f' \nДлительность: {"{:.2f}". format(client.users_likes_tracks()[int(number)].fetch_track().duration_ms / 60000)} мин')    
+        # print(f'\n\n{client.users_likes_tracks()[int(number)].fetch_track()}\n\n')
+        voice.play(FFmpegPCMAudio('example.mp3'), after=lambda a: loop.create_task(Yandex_like_play(ctx, None, True))) # Запускаем трек, а по окончанию запускаем следующий из очереди
+            
 
-        URL = info['formats'][0]['url']
 
-        vc.play(discord.FFmpegPCMAudio(executable="bin/ffmpeg.exe", source = URL, **FFMPEG_OPTIONS))
-        # vc.play(discord.FFmpegPCMAudio("It`s a TRAP.mp3"))
-                
-        while vc.is_playing():
-            await sleep(1)
-        if not vc.is_paused():
-            await vc.disconnect()
+@bot.command()                                          # указываем боту на то, что это его команда
+async def stop(ctx):
+    global voice
+    global Track_queue
 
+    try:
+        if voice.is_playing():
+            Track_queue = []
+            voice.stop()
+            await ctx.send(f'Как скажешь {ctx.message.author.name}, выключаю')
+    except:
+        await ctx.send(f'Так там и не играет ничего, что пристал то?')
+
+@bot.command()                                          # указываем боту на то, что это его команда
+async def skip(ctx):
+    global voice
+    global Track_queue
+
+    try:
+        if voice.is_playing() and Track_queue:
+            voice.stop()
+            await ctx.send(f'{ctx.message.author.name} сказал следующий, как скажешь')
+        elif voice.is_playing() and not Track_queue:
+            voice.stop()
+            await ctx.send(f'{ctx.message.author.name}, очередь пустая, так что я просто помолчу')
+    except:
+        await ctx.send(f'Так там и не играет ничего, что пристал то?')
+
+@bot.command()                                          # указываем боту на то, что это его команда
+async def pause(ctx):
+    global voice
+
+    try:
+        if voice.is_playing() and not voice.is_paused():
+            voice.pause()
+            await ctx.send(f'Окей {ctx.message.author.name}, как скажешь, подожду пока\nКогда захочешь продолжить напиши -resume')
+        elif voice.is_paused():
+            await ctx.send(f'Так там и так на паузе, что пристал то?')
+        else:
+            await ctx.send(f'Так там и не играет ничего, что пристал то?')
+    except AttributeError:
+        await ctx.send(f'Так там и не играет ничего, что пристал то?')
+
+
+@bot.command()                                          # указываем боту на то, что это его команда
+async def resume(ctx):
+    global voice
+
+    try:
+        if  voice.is_paused():
+            voice.resume()
+            await ctx.send(f'Продолжаем')
+        elif voice.is_playing():
+            await ctx.send(f'Так там и так играет, что пристал то?')
+        else:
+            await ctx.send(f'Нет треков на паузе, {ctx.message.author.name}, ты уверен что ставил что-то на паузу?')
+    except AttributeError:
+        await ctx.send(f'Нет треков на паузе, {ctx.message.author.name}, ты уверен что ставил что-то на паузу?')
+    
 
 @bot.command()
-async def yt(ctx, URL):
+async def p(ctx, URL):
+    global voice
 
     # Solves a problem I'll explain later
     FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
@@ -296,28 +373,25 @@ async def yt(ctx, URL):
     # voice = utils.get(bot.voice_clients, guild=ctx.guild)
 
     if not ctx.message.author.voice:
-        Url_1 = discord.Embed(
-            title = "No Voice Channel. You need to be in a voice channel to use this command!"
-        )
-        await ctx.send(embed=Url_1)
+        await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
         return
 
     channel = ctx.author.voice.channel
     voice = await channel.connect()
     
     # await ctx.send(f"Now playing {info['title']}.")
-
+    
     voice.play(FFmpegPCMAudio(source, **FFMPEG_OPTS), after=lambda e: print('done', e))
-    voice.is_playing()
 
 
 @bot.command()
 async def leave(ctx):
+    global voice
+    global Track_queue
     try:
+        Track_queue = []
         await ctx.voice_client.disconnect()
     except AttributeError:
         await ctx.send(f'Да ушел я уже, ушел, что ты такой злой?...')
 
 bot.run(TOKEN)
-# except Exception as e:
-#     print(type(e))
