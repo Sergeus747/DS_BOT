@@ -398,6 +398,9 @@ async def leave(ctx):
 
 @bot.command()
 async def ypls(ctx,*args):
+    global voice
+    global client
+    
     type_to_name = {
     'track': 'трек',
     'artist': 'исполнитель',
@@ -408,24 +411,31 @@ async def ypls(ctx,*args):
     'podcast': 'подкаст',
     'podcast_episode': 'эпизод подкаста',
     }
-    query = ' '.join(args)
-    search_result = client.search(query)
+    filename = 'example.mp3'
 
-    text = [f'Результаты по запросу "{query}":', '']
-
-    best_result_text = ''
-    if search_result.best:
-        best = search_result.best.result
-        track_info = search_result.tracks.results[0]
-        best.download('example.mp3',bitrate_in_kbps=320)
-        await ctx.send(f"Найдено: {track_info.artists_name()[0]}-{track_info.title}")
-
+    try:
         if ctx.message.author.voice == None:
             await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
             return
 
+        query = ' '.join(args)
+        search_result = client.search(query)
+        print(search_result.best.type)
+        if search_result.best and search_result.best.type == 'track':
+            track = search_result.best.result
+        else:
+            track = search_result.tracks.results[0]
+
+        track.download(filename,bitrate_in_kbps=320)
+        await ctx.send(f"Найдено: {track.artists_name()[0]}-{track.title}")
+
         channel = ctx.author.voice.channel
         voice = await channel.connect()
-        voice.play(FFmpegPCMAudio('example.mp3'))
+    except ClientException:
+        print(f'\nБот уже на канале, идем дальше\n')
 
-bot.run(TOKEN)
+    voice.play(FFmpegPCMAudio(filename))
+
+
+if __name__ == '__main__':
+    bot.run(TOKEN)
