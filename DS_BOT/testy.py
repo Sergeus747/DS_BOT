@@ -3,6 +3,7 @@ import asyncio
 import os
 import typing
 import random                                               # радномайзер
+from random import choice                                   # Выбор из списка
 import pafy
 import json
 from discord import *
@@ -25,7 +26,9 @@ client = None
 voice = None
 Track_queue = []
 
-Event = 0 # [1:Игра в кости; 2:]
+
+Event = 0 # [1:Игра в кости; 2:BlackJack; 3:]
+
 
 class ROLL_GAME():               # Класс парной игры в кости
     Is_playing = False           # Идет ли игра
@@ -38,9 +41,29 @@ class ROLL_GAME():               # Класс парной игры в кост�
         self.Whose_throw = 0
         return "Парные кости сброшены"
 
+
+class BLACKJACK_GAME():          # Класс игры в BLACKJACK
+    Is_playing = False           # Идет ли игра
+    player = [""]                # Кто играет
+    bot_keys = []
+    player_keys = []        
+    points = [0,0]               # Очки игроков
+    Stop = False                 # Закончил ли игрок добор
+    def reset(self):             # Сброс игры в начальное состояние
+        self.Is_playing = False
+        bot_keys = []
+        player_keys = [] 
+        self.points = [0,0]
+        self.Stop = False
+        return "BLACKJACK сброшен"
+
+
 GAME_1 = ROLL_GAME()             # Создание объекта класса, отвечающего за парную игру в кости
+GAME_2 = BLACKJACK_GAME()        # Создание объекта класса, отвечающего за игру в BLACKJACK
 
 rn = 0                           # рандомная переменная для выбора номера статьи
+deck = None                      # рандомная переменная для выбора номера колоды
+card = None                      # рандомная переменная для выбора номера карты
 
 
 def search(URL):
@@ -128,6 +151,122 @@ async def condemn(ctx, *, condemned):                   # Осуждение: {a
     await ctx.send(f'{condemned} осужден по статье {Article[rn]}\n Брагодарю {author} за донесение!')   # Отправка сообщения
     await ctx.send(embed=Url_1)                         # Отправка вложения
 
+
+@bot.command()                                          # указываем боту на то, что это его команда
+async def BlackJack(ctx):
+    global Event
+    global deck
+    global card
+    if Event == 0:
+        GAME_2 .player = ctx.message.author.mention
+        Event = 2
+        GAME_2.Is_playing = True
+        await ctx.send(f'{GAME_2.player}, желаешь сыграть в BlackJack?\n'
+        'Ну чтож начнем, только если проиграшь, чур потом не плакать.')
+        Cards_p= {
+            "2_Clubs": 2,       "2_Worms": 2,       "2_Peaks": 2,       "2_Diamonds": 2,
+            "3_Clubs": 3,       "3_Worms": 3,       "3_Peaks": 3,       "3_Diamonds": 3,
+            "4_Clubs": 4,       "4_Worms": 4,       "4_Peaks": 4,       "4_Diamonds": 4,
+            "5_Clubs": 5,       "5_Worms": 5,       "5_Peaks": 5,       "5_Diamonds": 5,
+            "6_Clubs": 6,       "6_Worms": 6,       "6_Peaks": 6,       "6_Diamonds": 6,
+            "7_Clubs": 7,       "7_Worms": 7,       "7_Peaks": 7,       "7_Diamonds": 7,
+            "8_Clubs": 8,       "8_Worms": 8,       "8_Peaks": 8,       "8_Diamonds": 8,
+            "9_Clubs": 9,       "9_Worms": 9,       "9_Peaks": 9,       "9_Diamonds": 9,
+            "10_Clubs": 10,     "10_Worms": 10,     "10_Peaks": 10,     "10_Diamonds": 10,
+            "Jack_Clubs": 10,   "Jack_Worms": 10,   "Jack_Peaks": 10,   "Jack_Diamonds": 10,
+            "Lady_Clubs": 10,   "Lady_Worms": 10,   "Lady_Peaks": 10,   "Lady_Diamonds": 10,
+            "King_Clubs": 10,   "King_Worms": 10,   "King_Peaks": 10,   "King_Diamonds": 10,
+            "ACE_Clubs": 11,    "ACE_Worms": 11,    "ACE_Peaks": 11,    "ACE_Diamonds": 11
+        }
+        Cards= {
+            "2_Clubs": "",      "2_Worms": "",      "2_Peaks": "",      "2_Diamonds": "",
+            "3_Clubs": "",      "3_Worms": "",      "3_Peaks": "",      "3_Diamonds": "",
+            "4_Clubs": "",      "4_Worms": "",      "4_Peaks": "",      "4_Diamonds": "",
+            "5_Clubs": "",      "5_Worms": "",      "5_Peaks": "",      "5_Diamonds": "",
+            "6_Clubs": "",      "6_Worms": "",      "6_Peaks": "",      "6_Diamonds": "",
+            "7_Clubs": "",      "7_Worms": "",      "7_Peaks": "",      "7_Diamonds": "",
+            "8_Clubs": "",      "8_Worms": "",      "8_Peaks": "",      "8_Diamonds": "",
+            "9_Clubs": "",      "9_Worms": "",      "9_Peaks": "",      "9_Diamonds": "",
+            "10_Clubs": "",     "10_Worms": "",     "10_Peaks": "",     "10_Diamonds": "",
+            "Jack_Clubs": "",   "Jack_Worms": "",   "Jack_Peaks": "",   "Jack_Diamonds": "",
+            "Lady_Clubs": "",   "Lady_Worms": "",   "Lady_Peaks": "",   "Lady_Diamonds": "",
+            "King_Clubs": "",   "King_Worms": "",   "King_Peaks": "",   "King_Diamonds": "",
+            "ACE_Clubs": "",    "ACE_Worms": "",    "ACE_Peaks": "",    "ACE_Diamonds": ""
+        }
+
+        Cards_1 = Cards
+        Cards_2 = Cards
+        Cards_3 = Cards
+        Cards_4 = Cards
+        Cards_5 = Cards
+        Cards_6 = Cards
+
+        await ctx.send(f'Вот мои карты:')
+
+        for i in [0,1]:                                 # Бот набирает стартовые карты
+            deck = random.randint(1, 6)
+
+            if deck == 1:
+                card = choice(list(Cards_1.keys()))
+                del Cards_1[card]
+            elif deck == 2:
+                card = choice(list(Cards_2.keys()))
+                del Cards_2[card]
+            elif deck == 3:
+                card = choice(list(Cards_3.keys()))
+                del Cards_3[card]
+            elif deck == 4:
+                card = choice(list(Cards_4.keys()))
+                del Cards_4[card]
+            elif deck == 5:
+                card = choice(list(Cards_5.keys()))
+                del Cards_5[card]
+            elif deck == 6:
+                card = choice(list(Cards_6.keys()))
+                del Cards_6[card]
+
+            GAME_2.bot_keys.append(card)
+
+            if Cards_p[card] == 11 and GAME_2.points[0] + Cards_p[card] > 21:
+                GAME_2.points[0] += 1
+            else:
+                GAME_2.points[0] += Cards_p[card]
+        
+        for i in [0,1]:                                 # Игрок набирает стартовые карты
+            deck = random.randint(1, 6)
+
+            if deck == 1:
+                card = choice(list(Cards_1.keys()))
+                del Cards_1[card]
+            elif deck == 2:
+                card = choice(list(Cards_2.keys()))
+                del Cards_2[card]
+            elif deck == 3:
+                card = choice(list(Cards_3.keys()))
+                del Cards_3[card]
+            elif deck == 4:
+                card = choice(list(Cards_4.keys()))
+                del Cards_4[card]
+            elif deck == 5:
+                card = choice(list(Cards_5.keys()))
+                del Cards_5[card]
+            elif deck == 6:
+                card = choice(list(Cards_6.keys()))
+                del Cards_6[card]
+
+            GAME_2.player_keys.append(card)
+
+            if Cards_p[card] == 11 and GAME_2.points[1] + Cards_p[card] > 21:
+                GAME_2.points[1] += 1
+            else:
+                GAME_2.points[1] += Cards_p[card]
+        await ctx.send(f'{GAME_2.bot_keys[0]} Рубашка')
+        await ctx.send(f'А вот твои карты: \n {GAME_2.player_keys[0]}  {GAME_2.player_keys[1]}')
+              
+    else:
+        await ctx.send(f'{ctx.message.author.mention} сейчас идет другая игра, дождитесь её окончания')
+
+
 @bot.command() # указываем боту на то, что это его команда
 async def Roll_play(ctx, Enemy):
     global Event
@@ -135,10 +274,12 @@ async def Roll_play(ctx, Enemy):
         GAME_1 .players[0] = ctx.message.author.mention
         GAME_1 .players[1] = Enemy
         Event = 1
-        await ctx.send(f'{GAME_1.players[0]} вызывает {GAME_1.players[1]} на поединок!\nВсе решится тремя бросками кости, согласен ли {GAME_1.players[1]} принять вызов?\nДля ответ введите -Y или -N.')
+        await ctx.send(f'{GAME_1.players[0]} вызывает {GAME_1.players[1]} на поединок!\n'\
+        f'Все решится тремя бросками кости, согласен ли {GAME_1.players[1]} принять вызов?\nДля ответ введите -Y или -N.')
         # my_file = open(имя_файла ,[ режим_доступа][, 0])
     else:
         await ctx.send(f'{ctx.message.author.mention} сейчас идет другая игра, дождитесь её окончания')
+
 
 @bot.command() # указываем боту на то, что это его команда
 async def Y(ctx):                                       # Принятие игры
@@ -253,7 +394,7 @@ async def join(ctx):
 @bot.command()                                          # указываем боту на то, что это его команда
 async def Yanlog(ctx):                            # Логинимся в свой аккаунт Яндекса
     global client
-    client = Client()
+    client = Client(report_new_fields=False)
     # print(CONFIG["EMAIL"], CONFIG["PASSWORD"])
     client = Client.from_credentials(CONFIG["EMAIL"], CONFIG["PASSWORD"])
     # client.users_likes_tracks()[0].fetch_track().download('example.mp3')
@@ -363,7 +504,7 @@ async def resume(ctx):
     
 
 @bot.command()
-async def p(ctx, URL):
+async def Youtube_play(ctx, URL):
     global voice
 
     # Solves a problem I'll explain later
@@ -392,7 +533,44 @@ async def leave(ctx):
         Track_queue = []
         await ctx.voice_client.disconnect()
     except AttributeError:
-        await ctx.send(f'Да ушел я уже, ушел, что ты такой злой?...')
+        await ctx.send(f'Да ушел я уже, ушел, что ты такой злой?...')   
+
+
+@bot.command()
+async def ypls(ctx,*args):
+    global client
+    global voice
+
+    type_to_name = {
+    'track': 'трек',
+    'artist': 'исполнитель',
+    'album': 'альбом',
+    'playlist': 'плейлист',
+    'video': 'видео',
+    'user': 'пользователь',
+    'podcast': 'подкаст',
+    'podcast_episode': 'эпизод подкаста',
+    }
+    query = ' '.join(args)
+    search_result = client.search(query)
+
+    text = [f'Результаты по запросу "{query}":', '']
+
+    best_result_text = ''
+    if search_result.best:
+        best = search_result.best.result
+        track_info = search_result.tracks.results[0]
+        best.download('example.mp3',bitrate_in_kbps=320)
+        await ctx.send(f"Найдено: {track_info.artists_name()[0]}-{track_info.title}")
+
+        if ctx.message.author.voice == None:
+            await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
+            return
+
+        channel = ctx.author.voice.channel
+        voice = await channel.connect()
+        voice.play(FFmpegPCMAudio('example.mp3'))
+
 
 
 
