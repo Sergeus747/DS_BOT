@@ -394,4 +394,38 @@ async def leave(ctx):
     except AttributeError:
         await ctx.send(f'Да ушел я уже, ушел, что ты такой злой?...')
 
+
+
+@bot.command()
+async def ypls(ctx,*args):
+    type_to_name = {
+    'track': 'трек',
+    'artist': 'исполнитель',
+    'album': 'альбом',
+    'playlist': 'плейлист',
+    'video': 'видео',
+    'user': 'пользователь',
+    'podcast': 'подкаст',
+    'podcast_episode': 'эпизод подкаста',
+    }
+    query = ' '.join(args)
+    search_result = client.search(query)
+
+    text = [f'Результаты по запросу "{query}":', '']
+
+    best_result_text = ''
+    if search_result.best:
+        best = search_result.best.result
+        track_info = search_result.tracks.results[0]
+        best.download('example.mp3',bitrate_in_kbps=320)
+        await ctx.send(f"Найдено: {track_info.artists_name()[0]}-{track_info.title}")
+
+        if ctx.message.author.voice == None:
+            await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
+            return
+
+        channel = ctx.author.voice.channel
+        voice = await channel.connect()
+        voice.play(FFmpegPCMAudio('example.mp3'))
+
 bot.run(TOKEN)
