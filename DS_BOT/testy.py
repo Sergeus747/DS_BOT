@@ -1,4 +1,5 @@
 import discord
+import signal
 import uuid
 import asyncio
 import os
@@ -31,33 +32,43 @@ Event = 0 # [1:Игра в кости; 2:BlackJack; 3:]
 
 class TrackQueue():                                     # Класс очереди треков
     queue = []
+    curent_track = None
 
     def not_empty(self):
         if self.queue:
             return True
         else:
             return False
+
+
     def add(self, track):
         self.queue.append(track)
         return "Трек добавлен в очередь"
+
+
     def take(self):
         track = self.queue[0]
         self.queue.remove(self.queue[0])
         return track
+
+
     def clean(self):
-        while len(self.queue) != 0:
+        while len(self.queue):
             track_name = self.queue[0]["File_name"]
             os.system(f"rm {track_name}")
             self.queue.remove(self.queue[0])
+
+
     def __del__(self):                                  # деструктор класса
-        while len(self.queue) != 0:
+        track_name = self.curent_track["File_name"]
+        os.system(f"rm {track_name}")
+        while len(self.queue):
             track_name = self.queue[0]["File_name"]
             os.system(f"rm {track_name}")
             self.queue.remove(self.queue[0])
-            del self.queue
 
 
-class RollGame():                                      # Класс парной игры в кости
+class RollGame():                                       # Класс парной игры в кости
     Is_playing = False                                  # Идет ли игра
     players = ["",""]                                   # Имена игроков
     points = [0,0]                                      # Очки игроков
@@ -94,6 +105,13 @@ deck = None                      # рандомная переменная дл�
 card = None                      # рандомная переменная для выбора номера карты
 
 
+def receiveSignal(signalNumber, frame):
+    global TrackQueue_1
+    del TrackQueue_1
+    raise SystemExit('Exiting')
+    return
+
+
 def search(URL):
     with YoutubeDL({'format': 'bestaudio', 'noplaylist':'True'}) as ydl:
         try: r_get(URL)
@@ -104,7 +122,8 @@ def search(URL):
 
 @bot.event
 async def on_ready():
-    print("Я запущен!\n")
+    await Yanlog()
+    print("Я родился!!!!\n")
 
 
 @bot.event
@@ -420,7 +439,7 @@ async def join(ctx):
 
 
 @bot.command()                                          # указываем боту на то, что это его команда
-async def Yanlog(ctx):                            # Логинимся в свой аккаунт Яндекса
+async def Yanlog():                                     # Логинимся в свой аккаунт Яндекса
     global client
     client = Client(report_new_fields=False)
     # print(CONFIG["EMAIL"], CONFIG["PASSWORD"])
@@ -471,6 +490,7 @@ async def play(ctx, track):
         print(f'\nБот уже на канале, идем дальше\n')
 
     loop = asyncio.get_event_loop()
+    TrackQueue_1.curent_track = track
     await ctx.send(f'сейчас играет: {track["artists_name"]}: {track["named:"]} \n{track["duration"]} ')    
     # print(f'\n\n{client.users_likes_tracks()[int(number)].fetch_track()}\n\n')
     voice.play(FFmpegPCMAudio(track["File_name"]), after=lambda a: loop.create_task(replay(ctx, track["File_name"]))) # Запускаем трек, а по окончанию запускаем следующий из очереди
@@ -620,4 +640,6 @@ async def Ysearch(ctx,*args):
 
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGTSTP, receiveSignal)
+    signal.signal(signal.SIGINT, receiveSignal)
     bot.run(TOKEN)
