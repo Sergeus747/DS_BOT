@@ -1,4 +1,5 @@
 import discord
+import uuid
 import asyncio
 import os
 import typing
@@ -24,32 +25,58 @@ bot = commands.Bot(command_prefix=('-'))
 bot.remove_command( 'help' )
 client = None
 voice = None
-Track_queue = []
-
 
 Event = 0 # [1:Игра в кости; 2:BlackJack; 3:]
 
 
-class ROLL_GAME():               # Класс парной игры в кости
-    Is_playing = False           # Идет ли игра
-    players = ["",""]            # Имена игроков
-    points = [0,0]               # Очки игроков
-    Whose_throw = 0              # Кто бросает
-    def reset(self):                 # Сброс игры в начальное состояние
+class TrackQueue():                                     # Класс очереди треков
+    queue = []
+
+    def not_empty(self):
+        if self.queue:
+            return True
+        else:
+            return False
+    def add(self, track):
+        self.queue.append(track)
+        return "Трек добавлен в очередь"
+    def take(self):
+        track = self.queue[0]
+        self.queue.remove(self.queue[0])
+        return track
+    def clean(self):
+        while len(self.queue) != 0:
+            track_name = self.queue[0]["File_name"]
+            os.system(f"rm {track_name}")
+            self.queue.remove(self.queue[0])
+    def __del__(self):                                  # деструктор класса
+        while len(self.queue) != 0:
+            track_name = self.queue[0]["File_name"]
+            os.system(f"rm {track_name}")
+            self.queue.remove(self.queue[0])
+            del self.queue
+
+
+class RollGame():                                      # Класс парной игры в кости
+    Is_playing = False                                  # Идет ли игра
+    players = ["",""]                                   # Имена игроков
+    points = [0,0]                                      # Очки игроков
+    Whose_throw = 0                                     # Кто бросает
+    def reset(self):                                    # Сброс игры в начальное состояние
         self.Is_playing = False
         self.points = [0,0]
         self.Whose_throw = 0
         return "Парные кости сброшены"
 
 
-class BLACKJACK_GAME():          # Класс игры в BLACKJACK
-    Is_playing = False           # Идет ли игра
-    player = [""]                # Кто играет
+class BlackJackGame():                                 # Класс игры в BLACKJACK
+    Is_playing = False                                  # Идет ли игра
+    player = [""]                                       # Кто играет
     bot_keys = []
     player_keys = []        
-    points = [0,0]               # Очки игроков
-    Stop = False                 # Закончил ли игрок добор
-    def reset(self):             # Сброс игры в начальное состояние
+    points = [0,0]                                      # Очки игроков
+    Stop = False                                        # Закончил ли игрок добор
+    def reset(self):                                    # Сброс игры в начальное состояние
         self.Is_playing = False
         bot_keys = []
         player_keys = [] 
@@ -58,8 +85,9 @@ class BLACKJACK_GAME():          # Класс игры в BLACKJACK
         return "BLACKJACK сброшен"
 
 
-GAME_1 = ROLL_GAME()             # Создание объекта класса, отвечающего за парную игру в кости
-GAME_2 = BLACKJACK_GAME()        # Создание объекта класса, отвечающего за игру в BLACKJACK
+GAME_1 = RollGame()             # Создание объекта класса, отвечающего за парную игру в кости
+GAME_2 = BlackJackGame()        # Создание объекта класса, отвечающего за игру в BLACKJACK
+TrackQueue_1 = TrackQueue()      # Создание объекта класса очереди подачи песен
 
 rn = 0                           # рандомная переменная для выбора номера статьи
 deck = None                      # рандомная переменная для выбора номера колоды
@@ -402,23 +430,35 @@ async def Yanlog(ctx):                            # Логинимся в сво
 
 
 @bot.command()                                          # указываем боту на то, что это его команда
-async def Yandex_like_play(ctx, number, from_q = False):
+async def Yandex_like_play(ctx, number):
     global client
     global voice
-    global Track_queue
 
-    if from_q:
-        if Track_queue:
-            number = Track_queue[0]
-            Track_queue.remove(Track_queue[0])
-        else:
-            return
-    try:
-        os.system("rm example.mp3")
-        client.users_likes_tracks()[int(number)].fetch_track().download('example.mp3')
+    try:    
+        track = {
+            "File_name": f'{uuid.uuid1()}.mp3',
+            "artists_name": f'{client.users_likes_tracks()[int(number)-1].fetch_track().artists_name()[0]}',
+            "named:": f': {client.users_likes_tracks()[int(number)-1].fetch_track().title}',
+            "duration": f'Длительность: {"{:.2f}". format(client.users_likes_tracks()[int(number)-1].fetch_track().duration_ms / 60000)} мин'
+        }
+        client.users_likes_tracks()[int(number)-1].fetch_track().download(track["File_name"])
     except:
         await ctx.send(f'{ctx.message.author.mention}, я такого трека не нашел, ты уверен что он есть?')
         return
+    
+    try:
+        if voice.is_playing():
+            TrackQueue_1.add(track)
+            await ctx.send(f'Там уже что-то бренькает, так и быть, добавлю в очередь')
+        else:
+            await play(ctx, track)
+    except:
+        await play(ctx, track)
+        
+
+async def play(ctx, track):
+    global client
+    global voice
 
     try:
         if ctx.message.author.voice == None:
@@ -430,27 +470,35 @@ async def Yandex_like_play(ctx, number, from_q = False):
     except ClientException:
         print(f'\nБот уже на канале, идем дальше\n')
 
-    if voice.is_playing():
-        Track_queue.append(number)
-        await ctx.send(f'Там уже что-то бренькает, так и быть, добавлю в очередь')
+    loop = asyncio.get_event_loop()
+    await ctx.send(f'сейчас играет: {track["artists_name"]}: {track["named:"]} \n{track["duration"]} ')    
+    # print(f'\n\n{client.users_likes_tracks()[int(number)].fetch_track()}\n\n')
+    voice.play(FFmpegPCMAudio(track["File_name"]), after=lambda a: loop.create_task(replay(ctx, track["File_name"]))) # Запускаем трек, а по окончанию запускаем следующий из очереди
+
+
+async def replay(ctx, track_name):
+    global voice
+
+    try:
+        os.system(f"rm {track_name}")
+    except:
+        print('\nЧто-то пошло не так с удалением трека!!!\n')
+
+    if TrackQueue_1.not_empty():
+        track = TrackQueue_1.take()
     else:
-        loop = asyncio.get_event_loop()
-        await ctx.send(f'сейчас играет: {client.users_likes_tracks()[int(number)].fetch_track().artists_name()[0]}'\
-        f': {client.users_likes_tracks()[int(number)].fetch_track().title}'\
-        f' \nДлительность: {"{:.2f}". format(client.users_likes_tracks()[int(number)].fetch_track().duration_ms / 60000)} мин')    
-        # print(f'\n\n{client.users_likes_tracks()[int(number)].fetch_track()}\n\n')
-        voice.play(FFmpegPCMAudio('example.mp3'), after=lambda a: loop.create_task(Yandex_like_play(ctx, None, True))) # Запускаем трек, а по окончанию запускаем следующий из очереди
-            
+        return
+
+    await play(ctx, track)
 
 
 @bot.command()                                          # указываем боту на то, что это его команда
 async def stop(ctx):
     global voice
-    global Track_queue
 
     try:
         if voice.is_playing():
-            Track_queue = []
+            TrackQueue_1.clean()
             voice.stop()
             await ctx.send(f'Как скажешь {ctx.message.author.name}, выключаю')
     except:
@@ -459,13 +507,12 @@ async def stop(ctx):
 @bot.command()                                          # указываем боту на то, что это его команда
 async def skip(ctx):
     global voice
-    global Track_queue
 
     try:
-        if voice.is_playing() and Track_queue:
+        if voice.is_playing() and TrackQueue_1.not_empty():
             voice.stop()
             await ctx.send(f'{ctx.message.author.name} сказал следующий, как скажешь')
-        elif voice.is_playing() and not Track_queue:
+        elif voice.is_playing() and not TrackQueue_1.not_empty():
             voice.stop()
             await ctx.send(f'{ctx.message.author.name}, очередь пустая, так что я просто помолчу')
     except:
@@ -528,91 +575,48 @@ async def Youtube_play(ctx, URL):
 @bot.command()
 async def leave(ctx):
     global voice
-    global Track_queue
     try:
-        Track_queue = []
+        TrackQueue_1.clean()
         await ctx.voice_client.disconnect()
     except AttributeError:
         await ctx.send(f'Да ушел я уже, ушел, что ты такой злой?...')   
 
 
 @bot.command()
-async def ypls(ctx,*args):
-    global client
-    global voice
-
-    type_to_name = {
-    'track': 'трек',
-    'artist': 'исполнитель',
-    'album': 'альбом',
-    'playlist': 'плейлист',
-    'video': 'видео',
-    'user': 'пользователь',
-    'podcast': 'подкаст',
-    'podcast_episode': 'эпизод подкаста',
-    }
-    query = ' '.join(args)
-    search_result = client.search(query)
-
-    text = [f'Результаты по запросу "{query}":', '']
-
-    best_result_text = ''
-    if search_result.best:
-        best = search_result.best.result
-        track_info = search_result.tracks.results[0]
-        best.download('example.mp3',bitrate_in_kbps=320)
-        await ctx.send(f"Найдено: {track_info.artists_name()[0]}-{track_info.title}")
-
-        if ctx.message.author.voice == None:
-            await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
-            return
-
-        channel = ctx.author.voice.channel
-        voice = await channel.connect()
-        voice.play(FFmpegPCMAudio('example.mp3'))
-
-
-
-
-@bot.command()
-async def ypls(ctx,*args):
+async def Ysearch(ctx,*args):
     global voice
     global client
     
-    type_to_name = {
-    'track': 'трек',
-    'artist': 'исполнитель',
-    'album': 'альбом',
-    'playlist': 'плейлист',
-    'video': 'видео',
-    'user': 'пользователь',
-    'podcast': 'подкаст',
-    'podcast_episode': 'эпизод подкаста',
+    if ctx.message.author.voice == None:
+        await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
+        return
+
+    query = ' '.join(args)
+    search_result = client.search(query)
+    print(search_result.best.type)
+    
+    if search_result.best and search_result.best.type == 'track':
+        track_s = search_result.best.result
+    else:
+        track_s = search_result.tracks.results[0]
+
+    track = {
+        "File_name": f'{uuid.uuid1()}.mp3',
+        "artists_name": f'{track_s.artists_name()[0]}',
+        "named:": f': {track_s.title}',
+        "duration": f'Длительность: {"{:.2f}". format(track_s.duration_ms / 60000)} мин'
     }
-    filename = 'example.mp3'
+
+    track_s.download(track["File_name"],bitrate_in_kbps=320)
 
     try:
-        if ctx.message.author.voice == None:
-            await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
-            return
-
-        query = ' '.join(args)
-        search_result = client.search(query)
-        print(search_result.best.type)
-        if search_result.best and search_result.best.type == 'track':
-            track = search_result.best.result
+        if voice.is_playing():
+            TrackQueue_1.add(track)
+            await ctx.send(f'Там уже что-то бренькает, так и быть, добавлю в очередь')
         else:
-            track = search_result.tracks.results[0]
-
-        track.download(filename,bitrate_in_kbps=320)
-        await ctx.send(f"Найдено: {track.artists_name()[0]}-{track.title}")
-
-        channel = ctx.author.voice.channel
-        voice = await channel.connect()
-    except ClientException:
-        print(f'\nБот уже на канале, идем дальше\n')
-
-    voice.play(FFmpegPCMAudio(filename))
+            await play(ctx, track)
+    except:
+        await play(ctx, track)
 
 
 if __name__ == '__main__':
