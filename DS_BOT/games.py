@@ -1,19 +1,23 @@
 import copy
+import random                                               # радномайзер
+from random import choice                                   # Выбор из списка
 
 
-class RollGame():                                       # Класс парной игры в кости
-    Is_playing = False                                  # Идет ли игра
-    players = ["",""]                                   # Имена игроков
-    points = [0,0]                                      # Очки игроков
-    Whose_throw = 0                                     # Кто бросает
-    def reset(self):                                    # Сброс игры в начальное состояние
+class RollGame():                                           # Класс парной игры в кости
+    Is_playing = False                                      # Идет ли игра
+    players = ["",""]                                       # Имена игроков
+    points = [0,0]                                          # Очки игроков
+    Whose_throw = 0                                         # Кто бросает
+
+
+    def reset(self):                                        # Сброс игры в начальное состояние
         self.Is_playing = False
         self.points = [0,0]
         self.Whose_throw = 0
         return 'Парные кости сброшены'
 
 
-class BlackJackGame():                                  # Класс игры в BLACKJACK
+class BlackJackGame():                                      # Класс игры в BLACKJACK
 
     Cards_p= {
         '2_Clubs': 2,       '2_Worms': 2,       '2_Peaks': 2,       '2_Diamonds': 2,
@@ -48,29 +52,74 @@ class BlackJackGame():                                  # Класс игры в
         'Shirt': 'Cards/Shirt.png'
     }
 
-    Is_playing = False                                  # Идет ли игра
-    player = [""]                                       # Кто играет
+    Is_playing = False                                      # Идет ли игра
+    player = [""]                                           # Кто играет
     bot_keys = []
     player_keys = []   
     bot_points = 0
-    player_points = [0]                                      # Очки игроков
-    Stop = False                                        # Закончил ли игрок добор
-    def reset(self):                                    # Сброс игры в начальное состояние
+    player_points = [0]                                     # Очки игроков
+    bet = 0                                                 # Ставка
+
+
+    def reset(self):                                        # Сброс игры в начальное состояние
         self.Is_playing = False
         self.player = [""]  
         self.bot_keys = []
         self.player_keys = []
         self.bot_points = 0 
         self.player_points = [0]
-        self.Stop = False
+        self.bet = 0 
         return "BLACKJACK сброшен"
+
+
+    def hand_starter_deck(self, name, count):               # Раздача страктовой колоды
+        self.player = name
+        self.Is_playing = True
+        self.bet = int(count)
+        decks = []                                          # Массив колод
+
+        for i in range(6):                                  # Заполнение колод
+            decks.append(self.get_deck())
+
+        for i in range(2):                                  # Бот набирает стартовые карты
+            deck = random.randint(0, 5)                     # Выбор колоды
+
+            card = choice(list(decks[deck].keys()))
+            del decks[deck][card]
+            
+            self.bot_take_card(card)                        # Бот берет карту
+        # print (self.bot_keys)
+
+        
+        for i in range(2):                                  # Игрок набирает стартовые карты
+            deck = random.randint(0, 5)                     # Выбор колоды
+
+            card = choice(list(decks[deck].keys()))
+            del decks[deck][card]
+
+            self.player_take_card(card)                     # Игрок берет карту
+        # print (self.player_keys)
 
 
     def get_deck(self):
         return copy.copy(self.Cards_p)
 
 
-    def bot_take_card(self, card):                      # бот берет карту
+    def check_bot_blackjack(self):
+        if self.bot_points == 21:
+            return True
+        else:
+            return False
+
+
+    def check_player_blackjack(self, number):
+        if self.player_points[number] == 21:
+            return True
+        else:
+            return False
+
+
+    def bot_take_card(self, card):                          # бот берет карту
         self.bot_keys.append(card)
         if self.Cards_p[card] == 11 and self.bot_points > 10:
             self.bot_points += 1
@@ -79,7 +128,7 @@ class BlackJackGame():                                  # Класс игры в
         return "бот взял карту"
 
 
-    def player_take_card(self, card):                   # игрок берет карту
+    def player_take_card(self, card):                       # игрок берет карту
         self.player_keys.append(card)
         if self.Cards_p[card] == 11 and self.player_points[0] > 10:
             self.player_points[0] += 1
@@ -89,21 +138,21 @@ class BlackJackGame():                                  # Класс игры в
 
 
     def bot_show_card(self, number):
-        return self.Cards[self.bot_keys[number]]
+        return copy.copy(self.Cards[self.bot_keys[number]])
     
 
     def player_show_card(self, number):
-        return self.Cards[self.player_keys[number]]
+        return copy.copy(self.Cards[self.player_keys[number]])
 
 
-    def show_player_points(self):
-        return self.player_points
+    def show_player_points(self, number):
+        return copy.copy(self.player_points[number])
 
 
     def show_bot_points(self):
-        return self.bot_points
+        return copy.copy(self.bot_points)
 
 
     def show_shirt(self):
-        return self.Cards['Shirt']
+        return copy.copy(self.Cards['Shirt'])
     

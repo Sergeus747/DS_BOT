@@ -135,60 +135,72 @@ async def condemn(ctx, *, condemned):                   # Осуждение: {a
     await ctx.send(embed=Url_1)                         # Отправка вложения
 
 
-@bot.command()                                          # указываем боту на то, что это его команда
-async def BlackJack(ctx):
+@bot.command()                                             # указываем боту на то, что это его команда
+async def BlackJack(ctx, bet = -1):
     global Event
     global deck
     global card
+
     if Event == 0:
-        GAME_2 .player = ctx.message.author.mention
+
+        if bet == -1:
+            await ctx.send(f'{ctx.message.author.mention}, я бесплатно играть не буду, делай ставку!\n')
+            return
+
+        elif bet <= 0:
+            await ctx.send(f'{ctx.message.author.mention}, ну ты где такие ставки видел, а ну поставь нормально!\n')
+            return
+
         Event = 2
-        GAME_2.Is_playing = True
-        await ctx.send(f'{GAME_2.player}, желаешь сыграть в BlackJack?\n'
-        'Ну чтож начнем, только чур я диллер.')
+
+        await ctx.send(f'{ctx.message.author.mention}, давай сыграем в BlackJack?\n'
+        f'Чур я диллер! Твоя ставка: {bet}.')
+
+        GAME_2.hand_starter_deck(ctx.message.author.mention, bet)       
+
+        await ctx.send('Вот мои карты: ')
+
+        for i in range(2):
+            my_files = discord.File(GAME_2.bot_show_card(i))
+            await ctx.send(file=my_files)
+
         
-        decks = []                                         # Массив колод
+        await ctx.send('А вот твои карты: ')
 
-        for i in range(6):                                 # Заполнение колод
-            decks.append(GAME_2.get_deck())
-
-        for i in range(2):                                 # Бот набирает стартовые карты
-            deck = random.randint(0, 5)                    # Выбор колоды
-
-            card = choice(list(decks[deck].keys()))
-            del decks[deck][card]
-            
-            GAME_2.bot_take_card(card)                     # Бот берет карту
+        for i in range(2):
+            my_files =  discord.File(GAME_2.player_show_card(i))
+            await ctx.send(file=my_files)
         
-        for i in range(2):                                 # Игрок набирает стартовые карты
-            deck = random.randint(0, 5)                    # Выбор колоды
-
-            card = choice(list(decks[deck].keys()))
-            del decks[deck][card]
-
-            GAME_2.player_take_card(card)                  # Игрок берет карту
-
-        await ctx.send(f'Вот мои карты: ')
-
-        my_files = [
-            discord.File(GAME_2.bot_show_card(0)),
-            discord.File(GAME_2.show_shirt()),
-        ]
-
-        await ctx.send(files=my_files)
-        await ctx.send(f'А вот твои карты: ')
-
-        my_files = [
-            discord.File(GAME_2.player_show_card(0)),
-            discord.File(GAME_2.player_show_card(1))
-        ]
-
-        await ctx.send(files=my_files)
-        await ctx.send(f'На данный момент твой общий счет: {GAME_2.show_player_points()}')
-
-              
+        if GAME_2.check_bot_blackjack() and not GAME_2.check_player_blackjack(0):
+            await ctx.send('Ха-ха, посмотри ка, у меня BlackJack:')
+            my_files = [
+                discord.File(GAME_2.bot_show_card(0)),
+                discord.File(GAME_2.bot_show_card(1)),
+            ]
+            await ctx.send(files=my_files)
+            await ctx.send('Игра окончена, я забираю твои деньги)')
+            GAME_2.reset()
+            Event = 0
+            return
+        elif GAME_2.check_bot_blackjack() and GAME_2.check_player_blackjack(0):
+            await ctx.send(f'Вот блин, ничья, забирай свою ставку обратно: {GAME_2.bet}')
+            GAME_2.reset()
+            Event = 0
+            return
+        elif GAME_2.check_player_blackjack(0):
+            await ctx.send(f'{ctx.message.author.mention}, ну и везучий же ты, сразу BlackJack!\nПоздравляю с победой, забирай награду: {GAME_2.bet * 5/2}')
+            GAME_2.reset()
+            Event = 0
+            return         
     else:
         await ctx.send(f'{ctx.message.author.mention} сейчас идет другая игра, дождитесь её окончания')
+
+@bot.command() # указываем боту на то, что это его команда
+async def still(ctx):
+    global Event
+
+    if Event == 2 and GAME_2.Is_playing == False:
+        pass
 
 
 @bot.command() # указываем боту на то, что это его команда
@@ -283,15 +295,14 @@ async def Stop_games(ctx):                              # Остановка в�
     global Event
     if Event == 0:
         await ctx.send(f'Нет запущенных игр.')
+        return
     elif Event == 1:
         GAME_1.reset()                                  # Сброс парных костей до базового состояния
-        print(f'\n Номер ивента: {Event}   Состояние игры: {GAME_1.Is_playing}\n\n')
     elif Event == 2:
         GAME_2.reset()                                  # Сброс BlackJack до базового состояния
-        print(f'\n Номер ивента: {Event}   Состояние игры: {GAME_1.Is_playing}\n\n')
         # место дня новых ресеторв
-        await ctx.send(f'{ctx.message.author.mention} сказал конец веселью, своравайте доски, прячьте кости.')
-        Event = 0                                       # Сброс номера ивента
+    await ctx.send(f'{ctx.message.author.mention} сказал конец веселью, своравайте доски, прячьте кости.')
+    Event = 0                                           # Сброс номера ивента
            
 
 @bot.command() # указываем боту на то, что это его команда
