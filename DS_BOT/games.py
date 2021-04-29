@@ -54,50 +54,47 @@ class BlackJackGame():                                      # Класс игр�
 
     Is_playing = False                                      # Идет ли игра
     player = [""]                                           # Кто играет
+    decks = []
     bot_keys = []
-    player_keys = []   
+    player_keys = [[], []]
+    locked = [False, False]
+    lose = [False, False]
+    Was_there_a_split = False
     bot_points = 0
-    player_points = [0]                                     # Очки игроков
-    bet = 0                                                 # Ставка
+    player_points = [0,0]                                    # Очки игроков
+    bet = [0, 0]                                             # Ставка
 
 
     def reset(self):                                        # Сброс игры в начальное состояние
         self.Is_playing = False
         self.player = [""]  
+        self.decks = []
         self.bot_keys = []
-        self.player_keys = []
+        self.player_keys = [[], []]
+        self.locked = [False, False]
+        self.lose = [False, False]
+        self.Was_there_a_split = False 
         self.bot_points = 0 
-        self.player_points = [0]
-        self.bet = 0 
+        self.player_points = [0,0]
+        self.bet = [0, 0] 
         return "BLACKJACK сброшен"
 
 
     def hand_starter_deck(self, name, count):               # Раздача страктовой колоды
         self.player = name
         self.Is_playing = True
-        self.bet = int(count)
-        decks = []                                          # Массив колод
+        self.bet[0] = int(count)
 
         for i in range(6):                                  # Заполнение колод
-            decks.append(self.get_deck())
+            self.decks.append(self.get_deck())
 
         for i in range(2):                                  # Бот набирает стартовые карты
-            deck = random.randint(0, 5)                     # Выбор колоды
-
-            card = choice(list(decks[deck].keys()))
-            del decks[deck][card]
-            
-            self.bot_take_card(card)                        # Бот берет карту
+            self.bot_take_card()                            # Бот берет карту
         # print (self.bot_keys)
 
         
         for i in range(2):                                  # Игрок набирает стартовые карты
-            deck = random.randint(0, 5)                     # Выбор колоды
-
-            card = choice(list(decks[deck].keys()))
-            del decks[deck][card]
-
-            self.player_take_card(card)                     # Игрок берет карту
+            self.player_take_card(0)                        # Игрок берет карту
         # print (self.player_keys)
 
 
@@ -112,41 +109,112 @@ class BlackJackGame():                                      # Класс игр�
             return False
 
 
-    def check_player_blackjack(self, number):
-        if self.player_points[number] == 21:
+    def check_player_blackjack(self):
+        if self.player_points[0] == 21:
             return True
         else:
             return False
 
 
-    def bot_take_card(self, card):                          # бот берет карту
+    def can_split(self):
+        if self.count_player_cards(0) == 2 and self.Cards_p[self.player_keys[0][0]] == self.Cards_p[self.player_keys[0][1]] and not self.Was_there_a_split:
+            return True
+        else:
+            return False
+
+
+    def split(self):
+        if self.can_split():
+            self.bet[1] = self.bet[0]
+            for i in range(2):
+                self.player_take_card(1)
+            self.Was_there_a_split = True
+            return True
+        else:
+            return False
+
+
+    def lock(self, hand):
+        self.locked[hand] = True
+
+
+    def gg(self, hand):
+        self.lose[hand] = True
+
+
+    def lose_check(self):
+        if not self.Was_there_a_split and self.lose[0]:
+            return True
+        elif self.Was_there_a_split and self.lose[0] and self.lose[1]:
+            return True
+        else:
+            return False
+
+
+    def lock_check(self):
+        if not self.Was_there_a_split and self.locked[0]:
+            return True
+        elif self.Was_there_a_split and self.locked[0] and self.locked[1]:
+            return True
+        else:
+            return False
+
+
+    def bot_take_card(self):                                # бот берет карту
+        deck = random.randint(0, 5)                         # Выбор колоды
+
+        card = choice(list(self.decks[deck].keys()))
+        del self.decks[deck][card]
+
         self.bot_keys.append(card)
         if self.Cards_p[card] == 11 and self.bot_points > 10:
             self.bot_points += 1
         else:
             self.bot_points += self.Cards_p[card]
-        return "бот взял карту"
+        # return "бот взял карту"
 
 
-    def player_take_card(self, card):                       # игрок берет карту
-        self.player_keys.append(card)
-        if self.Cards_p[card] == 11 and self.player_points[0] > 10:
-            self.player_points[0] += 1
+    def bot_gets_the_cards(self):
+        while self.bot_points < 17:            
+            self.bot_take_card()                            # Бот берет карту
+        if self.bot_points > 21:
+            return False
         else:
-            self.player_points[0] += self.Cards_p[card]
-        return "игрок взял карту"
+            return True
+
+
+    def player_take_card(self, hand):                       # игрок берет карту
+        deck = random.randint(0, 5)                         # Выбор колоды
+
+        card = choice(list(self.decks[deck].keys()))
+        del self.decks[deck][card]
+
+        self.player_keys[hand].append(card)
+        if self.Cards_p[card] == 11 and self.player_points[hand] > 10:
+            self.player_points[hand] += 1
+        else:
+            self.player_points[hand] += self.Cards_p[card]
+        # return "игрок взял карту"
 
 
     def bot_show_card(self, number):
         return copy.copy(self.Cards[self.bot_keys[number]])
     
 
-    def player_show_card(self, number):
-        return copy.copy(self.Cards[self.player_keys[number]])
+    def player_show_card(self, hand, number):
+        return copy.copy(self.Cards[self.player_keys[hand][number]])
 
 
-    def show_player_points(self, number):
-        return copy.copy(self.player_points[number])
+    def count_bot_cards(self):
+        return len(self.bot_keys)
+
+
+    def count_player_cards(self, hand):
+        return len(self.player_keys[hand])
+
+
+    def show_player_points(self, hand):
+        return copy.copy(self.player_points[hand])
 
 
     def show_bot_points(self):

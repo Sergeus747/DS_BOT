@@ -37,8 +37,6 @@ GAME_2 = BlackJackGame()         # Создание объекта класса,
 TrackQueue_1 = TrackQueue()      # Создание объекта класса очереди подачи песен
 
 rn = 0                           # рандомная переменная для выбора номера статьи
-deck = None                      # рандомная переменная для выбора номера колоды
-card = None                      # рандомная переменная для выбора номера карты
 
 
 def receiveSignal(signalNumber, frame):
@@ -138,8 +136,6 @@ async def condemn(ctx, *, condemned):                   # Осуждение: {a
 @bot.command()                                             # указываем боту на то, что это его команда
 async def BlackJack(ctx, bet = -1):
     global Event
-    global deck
-    global card
 
     if Event == 0:
 
@@ -160,47 +156,262 @@ async def BlackJack(ctx, bet = -1):
 
         await ctx.send('Вот мои карты: ')
 
-        for i in range(2):
-            my_files = discord.File(GAME_2.bot_show_card(i))
-            await ctx.send(file=my_files)
+        my_files = discord.File(GAME_2.bot_show_card(0))
+        await ctx.send(file=my_files)
+
+        my_files = discord.File(GAME_2.show_shirt())
+        await ctx.send(file=my_files)
 
         
         await ctx.send('А вот твои карты: ')
 
         for i in range(2):
-            my_files =  discord.File(GAME_2.player_show_card(i))
-            await ctx.send(file=my_files)
+            my_file =  discord.File(GAME_2.player_show_card(0,i))
+            await ctx.send(file=my_file)
         
-        if GAME_2.check_bot_blackjack() and not GAME_2.check_player_blackjack(0):
+        if GAME_2.check_bot_blackjack() and not GAME_2.check_player_blackjack():
             await ctx.send('Ха-ха, посмотри ка, у меня BlackJack:')
-            my_files = [
-                discord.File(GAME_2.bot_show_card(0)),
-                discord.File(GAME_2.bot_show_card(1)),
-            ]
-            await ctx.send(files=my_files)
+
+            for i in range(2):
+                my_file = discord.File(GAME_2.bot_show_card(i))
+                await ctx.send(file=my_file)
+            
             await ctx.send('Игра окончена, я забираю твои деньги)')
             GAME_2.reset()
             Event = 0
             return
-        elif GAME_2.check_bot_blackjack() and GAME_2.check_player_blackjack(0):
-            await ctx.send(f'Вот блин, ничья, забирай свою ставку обратно: {GAME_2.bet}')
+        elif GAME_2.check_bot_blackjack() and GAME_2.check_player_blackjack():
+            await ctx.send(f'Вот блин, ничья, забирай свою ставку обратно: {GAME_2.bet[0]}')
             GAME_2.reset()
             Event = 0
             return
-        elif GAME_2.check_player_blackjack(0):
-            await ctx.send(f'{ctx.message.author.mention}, ну и везучий же ты, сразу BlackJack!\nПоздравляю с победой, забирай награду: {GAME_2.bet * 5/2}')
+        elif GAME_2.check_player_blackjack():
+            await ctx.send(f'{ctx.message.author.mention}, ну и везучий же ты, сразу BlackJack!\nПоздравляю с победой, забирай награду: {GAME_2.bet[0] * 5/2}')
             GAME_2.reset()
             Event = 0
-            return         
+            return 
+
+        await ctx.send(f'{ctx.message.author.mention}, Тебе доступны следующие команды:\n'\
+        '«-still» - взять ещё одну карту. (Это действие можно повторять, пока сумма очков не превышает 21)\n'\
+        '«-double» - удвоить ставку, взять ровно 1 карту и зафиксировать карты\n'\
+        '«-split» - продублировать свою ставку, разделить руку на две, получая две дополнительные карты. Далее эти руки играют независимо.'\
+        '(Доступно, только если в стартовой руке две карты одного достоинства)\n'\
+        '«-enough» - Зафиксировать свои карты\n'\
+        'Учти, «-split» можно делать только 1 раз, и если он был сделан, то для остальных команд нужно будет указывать номер руки\n'\
+        'Например «-still 1» или «-enough 2»')
+        # print(GAME_2.can_split())       
     else:
         await ctx.send(f'{ctx.message.author.mention} сейчас идет другая игра, дождитесь её окончания')
 
 @bot.command() # указываем боту на то, что это его команда
-async def still(ctx):
+async def still(ctx, hand = 1):
     global Event
 
-    if Event == 2 and GAME_2.Is_playing == False:
-        pass
+    if Event == 0:
+        await ctx.send(f'Нет активной игры')
+        return
+    elif Event !=2:
+        await ctx.send(f'Сейчас идет другая игра')
+        return
+    elif hand < 1 or hand > 2:
+        await ctx.send('Хватит подсовывать мне нелепые номера колод, есть только 1 или 2(если ты сплитанул)')
+        return
+    elif hand == 2 and not GAME_2.Was_there_a_split:
+        await ctx.send('Ты не сплитовал, так что такой колоды нет')
+        return
+    elif GAME_2.locked[hand-1]:
+        await ctx.send('Эта колода уже зафиксированна')
+        return
+    elif GAME_2.Is_playing:
+        hand -= 1
+        GAME_2.player_take_card(hand)
+        my_files =  discord.File(GAME_2.player_show_card(hand, GAME_2.count_player_cards(hand) - 1))
+        await ctx.send(file=my_files)
+
+        if GAME_2.show_player_points(hand) > 21: 
+            await ctx.send(f'Упс, перебор, колода номер {hand+1} проиграла')
+            GAME_2.lock(hand)
+            GAME_2.gg(hand)
+            await Summing_up(ctx)
+
+        elif GAME_2.show_player_points(hand) == 21:
+            await enough(ctx, hand+1)
+
+        else:
+            await ctx.send('Рискнешь взять ещё одну?)')
+
+
+@bot.command() # указываем боту на то, что это его команда  
+async def split(ctx):
+    global Event
+
+    if Event == 0:
+        await ctx.send('Нет активной игры')
+        return
+    elif Event != 2:
+        await ctx.send('Сейчас идет другая игра')
+        return
+    elif GAME_2.Was_there_a_split:
+        await ctx.send('«-split» можно делать только 1 раз')
+        return
+    else:
+        if GAME_2.split():
+            hand = 1
+            await ctx.send(f'Создана колода номер {hand + 1}')
+            for i in range(GAME_2.count_player_cards(hand)):
+                    my_file = discord.File(GAME_2.player_show_card(hand, i))
+                    await ctx.send(file=my_file)
+        else:
+            await ctx.send(f'Внимательнее прочитай правила')
+            return
+
+
+@bot.command() # указываем боту на то, что это его команда  
+async def double(ctx, hand = 1):
+    global Event
+
+    if Event == 0:
+        await ctx.send('Нет активной игры')
+        return
+    elif Event != 2:
+        await ctx.send('Сейчас идет другая игра')
+        return
+    elif hand < 1 or hand > 2:
+        await ctx.send('Хватит подсовывать мне нелепые номера колод, есть только 1 или 2(если ты сплитанул)')
+        return
+    elif hand == 2 and not GAME_2.Was_there_a_split:
+        await ctx.send('Ты не сплитовал, так что такой колоды нет')
+        return
+    elif GAME_2.locked[hand-1]:
+        await ctx.send('Эта колода уже зафиксированна')
+        return
+    else:
+        hand -= 1
+        GAME_2.bet[hand] *= 2
+        GAME_2.player_take_card(hand)
+        my_file = discord.File(GAME_2.player_show_card(hand, GAME_2.count_player_cards(hand) - 1))
+        await ctx.send(file=my_file)
+        GAME_2.lock(hand)
+        if GAME_2.show_player_points(hand) > 21:
+            await ctx.send(f'Упс, ты набрал больше 21, колода номер {hand+1} проиграла)')
+            GAME_2.gg(hand)
+        await Summing_up(ctx)
+        
+        
+async def Summing_up(ctx):
+    global Event
+
+    if GAME_2.lose_check():
+        await ctx.send('Не расстраивайся, приходи в следующий раз')
+        GAME_2.reset()
+        Event = 0
+        return
+    if GAME_2.lock_check():
+        await ctx.send('Все колоды зафиксированны, давай подведем итоги')
+        if GAME_2.bot_gets_the_cards():
+            await ctx.send('Вот мои карты: ')
+
+            for i in range(GAME_2.count_bot_cards()):
+                my_file = discord.File(GAME_2.bot_show_card(i))
+                await ctx.send(file=my_file)
+            await ctx.send(f'В сумме у меня: {GAME_2.show_bot_points()} ')
+
+            if not GAME_2.Was_there_a_split:
+                await ctx.send('У тебя только одна колода')
+                count = 1
+            else:
+                await ctx.send('У тебя две колоды')
+                count = 2
+            for t in range(count):
+                await ctx.send(f'Колода номер {t+1}:')
+
+                for i in range(GAME_2.count_player_cards(t)):
+                    my_file = discord.File(GAME_2.player_show_card(t, i))
+                    await ctx.send(file=my_file)
+
+                await ctx.send(f'Счет в этой колоде: {GAME_2.show_player_points(t)}')
+
+                if GAME_2.show_player_points(t) < GAME_2.show_bot_points() or GAME_2.show_player_points(t) > 21:
+                    await ctx.send(f'Колода номер {t+1} проиграла')
+
+                elif GAME_2.show_player_points(t) == GAME_2.show_bot_points():
+                    await ctx.send(f'Колода номер {t+1} ничья, забирай свою ставу: {GAME_2.bet[t]}')
+
+                elif GAME_2.show_player_points(0) > GAME_2.show_bot_points() and GAME_2.show_player_points(t) == 21:
+                    await ctx.send(f'Колода номер {t+1} BlackJack! Твой выигрыш: {GAME_2.bet[t] * 5/2}')
+
+                elif GAME_2.show_player_points(0) > GAME_2.show_bot_points() and GAME_2.show_player_points(t) != 21:
+                        await ctx.send(f'Колода номер {t+1} победа! Твой выигрыш: {GAME_2.bet[t] * 2}')
+
+
+            await ctx.send('Игра окончена, приходи ещё)')
+            GAME_2.reset()
+            Event = 0
+            return
+        else:
+            await ctx.send('Вот мои карты: ')
+
+            for i in range(GAME_2.count_bot_cards()):
+                my_file = discord.File(GAME_2.bot_show_card(i))
+                await ctx.send(file=my_file)
+
+            await ctx.send(f'В сумме у меня: {GAME_2.show_bot_points()} ')
+            await ctx.send('Вот черт, получается перебор, давай посмотрим что у тебя:')
+
+            if not GAME_2.Was_there_a_split:
+                await ctx.send('    Одна колода: ')
+
+                if GAME_2.show_player_points(0) == 21:
+                    await ctx.send(f'       Твой выигрыш: {GAME_2.bet[0] * 5/2}')
+                else:
+                    await ctx.send(f'       Твой выигрыш: {GAME_2.bet[0] * 2}')
+
+            else:
+                await ctx.send('    Две колоды: ')
+
+                for t in range(2):
+
+                    if GAME_2.lose[t]:
+                        await ctx.send(f'   Колода номер {t+1} уже проиграла')
+
+                    else:
+
+                        if GAME_2.show_player_points(t) == 21:
+                            await ctx.send(f'       Колода номер {t+1}. Твой выигрыш: {GAME_2.bet[t] * 5/2}')
+
+                        else:
+                            await ctx.send(f'       Колода номер {t+1}. Твой выигрыш: {GAME_2.bet[t] * 2}')
+
+            await ctx.send('Игра окончена, приходи ещё)')
+            GAME_2.reset()
+            Event = 0
+            return
+                
+
+@bot.command() # указываем боту на то, что это его команда  
+async def enough(ctx, hand = 1):
+    global Event
+    if Event == 0:
+        await ctx.send('Нет активной игры')
+        return
+    elif Event != 2:
+        await ctx.send('Сейчас идет другая игра')
+        return
+    elif hand < 1 or hand > 2:
+        await ctx.send('Хватит подсовывать мне нелепые номера колод, есть только 1 или 2(если ты сплитанул)')
+        return
+    elif hand == 2 and not GAME_2.Was_there_a_split:
+        await ctx.send('Ты не сплитовал, так что такой колоды нет')
+        return
+    elif GAME_2.locked[hand-1]:
+        await ctx.send('Эта колода уже зафиксированна')
+        return
+    else:
+        await ctx.send(f'Карты в колоде номер {hand} зафиксированны, больше туда добирать нельзя')
+        hand -= 1
+        GAME_2.lock(hand)
+        await Summing_up(ctx)
+
 
 
 @bot.command() # указываем боту на то, что это его команда
