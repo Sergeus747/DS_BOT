@@ -545,7 +545,8 @@ async def Yanlog():                                     # Логинимся в 
     global client
     client = Client(report_new_fields=False)
     client = Client.from_credentials(CONFIG["EMAIL"], CONFIG["PASSWORD"])
-
+    if not os.path.isdir('./tracks'):
+        os.system('mkdir tracks')
 
 @bot.command()                                          # указываем боту на то, что это его команда
 async def Yandex_like_play(ctx, number):
@@ -575,10 +576,32 @@ async def Yandex_d_play(ctx, arg1 = None, arg2 = None):
         finish = 59
     elif arg1 != None and arg2 == None:
         start = 0
-        finish = arg1
+        finish = int(arg1)
     elif arg1 != None and arg2 != None:
-        start = arg1
-        finish = arg2
+        start = int(arg1) - 1
+        finish = int(arg2) - 1
+    
+    if ctx.message.author.voice == None:
+        await ctx.send(f'{ctx.message.author.mention}, может сначала ты на канал зайдешь?')
+        return
+    
+    search_result = client.search('Плейлист дня')
+    
+    if search_result.best and search_result.best.type == 'playlist':
+        pls = search_result.best.result.fetch_tracks()
+    else:
+        pls = search_result.playlists.results[0].fetch_tracks()
+
+    for track_id in range(start,finish):
+        track = {
+            "File_name": f'tracks/{uuid.uuid1()}.mp3',
+            "artists_name": f'{pls[track_id].fetch_track().artists_name()[0]}',
+            "named:": f': {pls[track_id].fetch_track().title}',
+            "duration": f'Длительность: {"{:.2f}". format(pls[track_id].fetch_track().duration_ms / 60000)} мин'
+        }
+
+        pls[track_id].fetch_track().download(track["File_name"],bitrate_in_kbps=320)
+        await play(ctx, track)
 
 
 async def play(ctx, track):
@@ -598,7 +621,10 @@ async def play(ctx, track):
     try:
         if voice.is_playing():
             TrackQueue_1.add(track)
-            await ctx.send(f'Там уже что-то бренькает, так и быть, добавлю в очередь')
+            message = await ctx.history(limit=1).flatten()
+            message = message[0]
+            if not message.content == "Там уже что-то бренькает, так и быть, добавлю в очередь":
+                await ctx.send(f'Там уже что-то бренькает, так и быть, добавлю в очередь')
             return
     except:
         print("\nХрен его знает когда сработает\n\n")
@@ -748,6 +774,8 @@ async def Ysearch(ctx,*args):
     track_s.download(track["File_name"],bitrate_in_kbps=320)
 
     await play(ctx, track)
+
+
 
 
 if __name__ == '__main__':
