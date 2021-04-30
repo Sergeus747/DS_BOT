@@ -10,6 +10,7 @@ import pafy
 import json
 from discord import *
 from yandex_music import Client
+from yandex_music import playlist
 from requests import get as r_get
 from youtube_dl import YoutubeDL
 from discord.ext import commands
@@ -359,7 +360,7 @@ async def Summing_up(ctx):
             await ctx.send('Вот черт, получается перебор, давай посмотрим что у тебя:')
 
             if not GAME_2.Was_there_a_split:
-                await ctx.send('    Одна колода: ')
+                await ctx.send('    Твоя колода: ')
 
                 if GAME_2.show_player_points(0) == 21:
                     await ctx.send(f'       Твой выигрыш: {GAME_2.bet[0] * 5/2}')
@@ -372,7 +373,7 @@ async def Summing_up(ctx):
                 for t in range(2):
 
                     if GAME_2.lose[t]:
-                        await ctx.send(f'   Колода номер {t+1} уже проиграла')
+                        await ctx.send(f'       Колода номер {t+1} уже проиграла')
 
                     else:
 
@@ -549,7 +550,6 @@ async def Yanlog():                                     # Логинимся в 
 @bot.command()                                          # указываем боту на то, что это его команда
 async def Yandex_like_play(ctx, number):
     global client
-    global voice
 
     try:    
         track = {
@@ -564,7 +564,22 @@ async def Yandex_like_play(ctx, number):
         return
     
     await play(ctx, track)
-        
+
+
+@bot.command()                                          # указываем боту на то, что это его команда
+async def Yandex_d_play(ctx, arg1 = None, arg2 = None):
+    global client
+
+    if arg1 == None and arg2 == None:
+        start = 0
+        finish = 59
+    elif arg1 != None and arg2 == None:
+        start = 0
+        finish = arg1
+    elif arg1 != None and arg2 != None:
+        start = arg1
+        finish = arg2
+
 
 async def play(ctx, track):
     global client
